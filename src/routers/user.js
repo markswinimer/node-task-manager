@@ -28,6 +28,34 @@ router.post('/users/login', async (req, res) => {
     }
 })
 
+router.post('/users/logout', auth, async(req, res) => {
+    console.log("Logout user")
+
+    try {
+        req.user.tokens = req.user.tokens.filter((token) => {
+            return token.token !== req.token
+        })
+        await req.user.save()
+        res.send()
+    } catch (e) {
+        res.status(500).send()
+    }
+})
+
+router.post('/users/logoutAll', auth, async (req, res) => {
+    console.log("Logout all users")
+    console.log(req.user)
+
+    try {
+        req.user.tokens = []
+        await req.user.save()
+        res.send()
+    } catch (error) {
+        res.status(500).send()
+    }
+})
+
+
 router.get('/users/me', auth, async (req, res) => {
     res.send(req.user)
 })
@@ -48,20 +76,16 @@ router.get('/users/:id', async (req, res) => {
     }
 })
 
-router.delete('/users/:id', async (req, res) => {
+router.delete('/users/me', auth, async (req, res) => {
     try {
-        const user = await User.findByIdAndDelete(req.params.id)
-
-        if (!user) {
-            return res.status(400).send()
-        }
-        res.send(user)
+        await req.user.remove()
+        res.send(req.user)
     } catch (e) {
         res.status(404).send(e)
     }
 })
 
-router.patch('/users/:id', async (req, res) => {
+router.patch('/users/me', auth, async (req, res) => {
     const updates = Object.keys(req.body)
     const allowedUpdates = ['name', 'email', 'password', 'age']
     const isValidOperation = updates.every((update) => allowedUpdates.includes(update))
@@ -69,21 +93,10 @@ router.patch('/users/:id', async (req, res) => {
     if (!isValidOperation) {
         return res.status(400).send({ error: 'Invald Requests given' })
     }
-
     try {
-        const user = await User.findById(req.params.id)
-        // this method, as opposed to the one commented out below, does not bypass the 'pre' method
-        // in the model
-        updates.forEach((update) => user[update] = req.body[update])
-
-        await user.save()
-        // 3rd argument is { options }, new: true sends back the updated object not the found one
-        // const user = await User.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true })
-
-        if (!user) {
-            return res.status(404).send()
-        }
-        res.send(user)
+        updates.forEach((update) => req.user[update] = req.body[update])
+        await req.user.save()
+        res.send(req.user)
     } catch (e) {
         // could have a server connection/directory issue or a validation issue due to the runValidators option
         res.status(400).send(e)
